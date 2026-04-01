@@ -2,6 +2,7 @@
 
 import { motion, useInView } from "framer-motion";
 import { useRef, useState, FormEvent } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function Waitlist() {
   const ref = useRef(null);
@@ -10,7 +11,9 @@ export default function Waitlist() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
-  function handleSubmit(e: FormEvent) {
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
 
@@ -20,9 +23,20 @@ export default function Waitlist() {
       return;
     }
 
-    const existing = JSON.parse(localStorage.getItem("bloom_waitlist") || "[]");
-    existing.push({ email, timestamp: new Date().toISOString() });
-    localStorage.setItem("bloom_waitlist", JSON.stringify(existing));
+    setSubmitting(true);
+    const { error: dbError } = await supabase
+      .from("waitlist")
+      .insert({ email: email.toLowerCase().trim() });
+    setSubmitting(false);
+
+    if (dbError) {
+      if (dbError.code === "23505") {
+        setError("You're already on the list!");
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
+      return;
+    }
 
     setSubmitted(true);
   }
@@ -88,9 +102,10 @@ export default function Waitlist() {
               </div>
               <button
                 type="submit"
-                className="bg-bloom-green text-white font-semibold px-8 py-3.5 rounded-card hover:bg-bloom-green-light transition-colors shadow-lg shadow-bloom-green/20 whitespace-nowrap"
+                disabled={submitting}
+                className="bg-bloom-green text-white font-semibold px-8 py-3.5 rounded-card hover:bg-bloom-green-light transition-colors shadow-lg shadow-bloom-green/20 whitespace-nowrap disabled:opacity-60"
               >
-                Join the Waitlist
+                {submitting ? "Joining..." : "Join the Waitlist"}
               </button>
             </form>
           )}
